@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib as plt
 from BaseAlgorithm import BaseAlgorithm
 
 class Regression(BaseAlgorithm):
