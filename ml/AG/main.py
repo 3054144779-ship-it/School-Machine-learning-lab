@@ -49,8 +49,8 @@ def get_min_error_rate(func):
         best_lr = 0
         best_iters = 0
 
-        lr_list = np.arange(0.05, 0.3, 0.02)
-        iters_list = range(500, 20000, 2000) 
+        lr_list = np.arange(0.2, 0.3, 0.02)
+        iters_list = range(10000, 20000, 2000)
 
         total = len(lr_list) * len(iters_list)
         print(f"总共需要训练 {total} 次...")
@@ -134,4 +134,4 @@ def test3(lr=0.29, iters=16500):
 # if __name__ == "__main__":
     # test1() 
     # test2()
-    # test3()   
+    # test3()

@@ -35,6 +35,11 @@ class Regression(BaseAlgorithm):
             dw = np.dot(data.T, error) / n
             db = np.sum(error) / n
 
+            # 所有梯度的更新幅度都小于 1e-6，提前收敛
+            if np.max(np.abs(dw)) < 1e-6 and abs(db) < 1e-6:
+                print(f"在第 {i} 次迭代提前收敛！")
+                break
+
             self.w -= self.lr * dw
             self.b -= self.lr * db
 
