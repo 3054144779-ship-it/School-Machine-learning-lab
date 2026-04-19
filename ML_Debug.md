@@ -48,6 +48,18 @@ pip -verson
 pip install opencv-python
 ```
 
+###安装`html5lib`:
+
+```cmd
+pip install html5lib
+```
+
+###安装`feedparser`:
+
+```cmd
+pip install feedparser
+```
+
 ## lab1 语音识别(01)：
 
 技术文档：[语音技术](https://ai.baidu.com/ai-doc/SPEECH/0lbxfnc9b)(左侧SDK文档 $\rightarrow$ 语音识别 $\rightarrow$ API-PythonSDK)。
