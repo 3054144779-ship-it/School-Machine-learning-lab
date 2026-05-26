@@ -19,10 +19,11 @@ class Node:
         return self.value is not None
 
 class DecisionTree(BaseAlgorithm):
-    def __init__(self, min_samples_split=2, max_depth=100):
+    def __init__(self, min_samples_split=2, min_samples_leaf=1, max_depth=100):
         # 初始化父类，继承 train_data 和 train_labels 属性
         super().__init__()
         self.min_samples_split = min_samples_split
+        self.min_samples_leaf = min_samples_leaf
         self.max_depth = max_depth # 最大深度
         self.root = None # 根节点
 
@@ -53,26 +54,33 @@ class DecisionTree(BaseAlgorithm):
         # 寻找最佳分裂点
         best_feature, best_thresh = self._best_split(X, y, n_features)
 
+        # 找不到有效分裂（如所有特征值相同）
+        if best_feature is None:
+            leaf_value = self._most_common_label(y)
+            return Node(value=leaf_value)
+
         left_idxs, right_idxs = self._split(X[:, best_feature], best_thresh)
+
+        # 任一子节点样本数不足 min_samples_leaf，放弃分裂
+        if len(left_idxs) < self.min_samples_leaf or len(right_idxs) < self.min_samples_leaf:
+            leaf_value = self._most_common_label(y)
+            return Node(value=leaf_value)
+
         left_child = self._build_tree(X[left_idxs, :], y[left_idxs], depth + 1)
         right_child = self._build_tree(X[right_idxs, :], y[right_idxs], depth + 1)
-
         return Node(best_feature, best_thresh, left_child, right_child)
 
     # 枚举特征和阈值，找到最优。
     def _best_split(self, X, y, n_features):
-        '''
-        用两个 for 循环，尝试所有可能的特征和阈值。
-        每次尝试都用 _information_gain 函数打个分，
-        最后选出得分最高的那种分法（返回最佳特征的索引和阈值）。
-        '''
-        
         best_gain = -1
         split_idx, split_threshold = None, None
         for feature_idx in range(n_features):
             X_column = X[:, feature_idx]
             thresholds = np.unique(X_column)
             for thr in thresholds:
+                left_idxs, right_idxs = self._split(X_column, thr)
+                if len(left_idxs) < self.min_samples_leaf or len(right_idxs) < self.min_samples_leaf:
+                    continue
                 gain = self._information_gain(y, X_column, thr)
                 if gain > best_gain:
                     best_gain = gain
@@ -119,10 +127,8 @@ class DecisionTree(BaseAlgorithm):
 
     # 统计哪种类别居多
     def _most_common_label(self, y):
-        '''
-        当树停止生长，到达叶子节点时，这个节点里可能还有几条不同类别的数据(比如 3 个良性, 1 个恶性)。
-        这个函数会统计一下，发现“良性”最多，就把这个叶子节点的预测结果定为“良性”。
-        '''
+        if len(y) == 0:
+            return 0
         counter = Counter(y)
         return counter.most_common(1)[0][0]
 

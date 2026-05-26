@@ -1,12 +1,17 @@
 import os
 import numpy as np
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder 
 from knn import KNN
 from Logistic import Logistic
 from Regression import Regression
+from Decision_Tree import DecisionTree
+from sklearn.model_selection import train_test_split 
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
 
 def test1():
     # 获取 main.py 所在的绝对目录
-    current_dir = os.path.dirname(os.path.abspath(__file__))
     DATA_PATH = os.path.join(current_dir, 'KNN', 'data', 'datingTestSet2.txt')
 
     data = np.loadtxt(DATA_PATH, delimiter='\t')
@@ -49,8 +54,8 @@ def get_min_error_rate(func):
         best_lr = 0
         best_iters = 0
 
-        lr_list = np.arange(0.2, 0.3, 0.02)
-        iters_list = range(10000, 20000, 2000)
+        lr_list = np.arange(0.05, 0.3, 0.02)
+        iters_list = range(500, 20000, 2000) 
 
         total = len(lr_list) * len(iters_list)
         print(f"总共需要训练 {total} 次...")
@@ -73,7 +78,6 @@ def get_min_error_rate(func):
 def test2(lr=0.01, iters=500):
     # 存入缓存，防止频繁 IO
     if not hasattr(test2, "cache"):
-        current_dir = os.path.dirname(os.path.abspath(__file__))
         DATA_PATH = os.path.join(current_dir, 'LOGISTIC', 'HorseColicTraining.txt')
         DATA_TEST_PATH = os.path.join(current_dir, 'LOGISTIC', 'HorseColicTest.txt')
         
@@ -103,7 +107,6 @@ def test2(lr=0.01, iters=500):
 @get_min_error_rate
 def test3(lr=0.29, iters=16500):
     if not hasattr(test3, "cache"):
-        current_dir = os.path.dirname(os.path.abspath(__file__))
         DATA_PATH = os.path.join(current_dir, 'REGRESSION', 'abalone.txt')
 
         data = np.loadtxt(DATA_PATH)
@@ -130,8 +133,83 @@ def test3(lr=0.29, iters=16500):
     reg.fit(d["train_x"], d["train_y"])
     return reg.auto_test(d["test_x"], d["test_y"])
 
+# ==========================================
+# 决策树专属：通用数据清洗函数
+# ==========================================
+def load_and_clean_data(file_path):
+    """
+    通用数据加载函数：使用 pandas 读取文件，并将所有字符串特征转换为数字
+    自动检测分隔符：Tab 分隔则用 \\t，否则用连续空白 \\s+
+    """
+    with open(file_path, 'r') as f:
+        first_line = f.readline()
+    sep = r'\t' if '\t' in first_line else r'\s+'
 
-# if __name__ == "__main__":
+    df = pd.read_csv(file_path, header=None, sep=sep, engine='python')
+    df = df.dropna(axis=1, how='all')
+
+    le = LabelEncoder()
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            df[col] = le.fit_transform(df[col])
+
+    return df.values
+
+
+def run_tree_test(name, file_name, max_depth=5, test_size=0.2, rs=1):
+    """通用决策树测试：加载 -> 清洗 -> 划分 -> 训练 -> 评估 -> 可视化"""
+    DATA_PATH = os.path.join(current_dir, 'DecisionTree', file_name)
+    print(f"\n{'='*50}")
+    print(f"数据集: {name} ({file_name})")
+    print(f"{'='*50}")
+    print("正在加载并清洗数据...")
+    data = load_and_clean_data(DATA_PATH)
+    n_samples, n_features = data.shape[0], data.shape[1] - 1
+    n_classes = len(np.unique(data[:, -1]))
+    print(f"样本数: {n_samples}, 特征数: {n_features}, 类别数: {n_classes}")
+
+    features = data[:, 0:-1]
+    labels = data[:, -1]
+
+    train_features, test_features, train_labels, test_labels = train_test_split(
+        features, labels, test_size=test_size, random_state=rs
+    )
+
+    print("正在训练决策树模型...")
+    tree = DecisionTree(max_depth=max_depth)
+    tree.fit(train_features, train_labels)
+
+    print("正在评估模型...")
+    error_rate = tree.auto_test(test_features, test_labels)
+    acc = 1 - error_rate
+    print(f"测试集错误率: {error_rate:.2%}")
+    print(f"测试集准确率: {acc:.2%}")
+
+    print("正在绘制二维分布图...")
+    x_idx, y_idx = (0, 1) if n_features >= 2 else (0, 0)
+    tree.plot_2d(features=features, labels=labels, x_idx=x_idx, y_idx=y_idx,
+                 title=f"{name} ({n_samples} samples, {n_classes} classes)")
+    return tree, acc
+
+
+def test4():
+    print("--- 开始运行决策树测试 ---")
+
+    # 原始小数据集：隐形眼镜（24条，4特征，3分类）
+    run_tree_test("隐形眼镜", "lenses.txt", max_depth=5)
+
+    # 合成数据集1：简单二分类（150条，2特征）
+    run_tree_test("合成数据-简单二分类", "synthetic1.txt", max_depth=8)
+
+    # 合成数据集2：三分类（150条，3特征）
+    run_tree_test("合成数据-三分类", "synthetic2.txt", max_depth=8)
+
+    # 合成数据集3：带噪声二分类（150条，2特征）
+    run_tree_test("合成数据-带噪声二分类", "synthetic3.txt", max_depth=8)
+
+
+if __name__ == "__main__":
     # test1() 
     # test2()
-    # test3()
+    # test3()  
+    test4()
