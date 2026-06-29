@@ -12,7 +12,7 @@ class Node:
         self.threshold = threshold   # 划分的阈值
         self.left = left             # 左子树 
         self.right = right           # 右子树 
-        self.value = value           # 如果是叶子节点，这里保存预测的类别
+        self.value = value           # 叶子节点，保存预测的类别
 
     # 判断是否为叶子节点
     def is_leaf_node(self):
@@ -28,7 +28,6 @@ class DecisionTree(BaseAlgorithm):
         self.root = None # 根节点
 
     def fit(self, data, labels):
-        """实现父类的 fit 方法"""
         self.train_data = data
         self.train_labels = labels
         # 建树
@@ -36,8 +35,7 @@ class DecisionTree(BaseAlgorithm):
 
     def predict(self, input_data):
         """
-        实现父类的 predict 方法
-        注意：适配 auto_test, 这里的 input_data 是一条单一样本 (1D array)
+        注意: input_data 是一条单一样本 (1D array)
         """
         return self._traverse_tree(input_data, self.root)
 
@@ -46,7 +44,7 @@ class DecisionTree(BaseAlgorithm):
     def _build_tree(self, X, y, depth=0):
         n_samples, n_features = X.shape
         n_labels = len(np.unique(y))
-        # base case ：最大深度 样本为同一类 样本数小于分裂要求
+        # base case
         if (depth >= self.max_depth or n_labels == 1 or n_samples < self.min_samples_split):
             leaf_value = self._most_common_label(y)
             return Node(value=leaf_value)
@@ -115,7 +113,7 @@ class DecisionTree(BaseAlgorithm):
         right_idxs = np.argwhere(X_column > split_thresh).flatten()
         return left_idxs, right_idxs
 
-    # 计算信息熵(混乱程度)
+    # 计算信息熵
     def _entropy(self, y):
         '''
         如果一堆数据全是同一类，熵就是 0(极端纯粹); 如果一半A一半B, 熵就是 1(极度混乱)。
