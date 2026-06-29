@@ -1,0 +1,26 @@
+# 忽略 Python 运行产生的字节码缓存文件
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 忽略 Java 编译生成的字节码文件
+*.class
+
+# 忽略打包生成的归档文件
+*.jar
+*.war
+*.ear
+
+# 忽略各大构建工具和 IDE 的输出目录（最关键）
+target/
+build/
+out/
+bin/
+
+# 忽略 IDE 自动生成的工程配置文件（别人拉你的代码不需要这些）
+.idea/
+*.iml
+.settings/
+.classpath
+.project
