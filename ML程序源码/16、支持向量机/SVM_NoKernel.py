@@ -1,8 +1,5 @@
 from numpy import *
-import os
 import matplotlib.pyplot as plt
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
 
 class struct_operate:
     def __init__(self, matrix_data_input, labels_class, C, tolerance):  # 用相关参数初始化该结构体
@@ -59,10 +56,8 @@ def calculate_E_k(struct_operator, k):
     args:struct_operator:struct_operate对象;k:具体某一行
     returns:E_k:预测结果与真实结果比对,即计算误差
     """
-    # 采用更标准的 .item() 来提取1x1矩阵中的标量值，完美消除警告
-    fx_k_matrix = (multiply(struct_operator.alphas, struct_operator.matrix_labels)).T * (struct_operator.x * struct_operator.x[k].T)
-    fx_k = fx_k_matrix.item() + struct_operator.b
-    E_k = fx_k - struct_operator.matrix_labels[k].item()
+    fx_k = (multiply(struct_operator.alphas, struct_operator.matrix_labels)).T * (struct_operator.x * struct_operator.x[k].T) + struct_operator.b
+    E_k = fx_k - float(struct_operator.matrix_labels[k])
     return E_k
 
 def select_j(i, struct_operator, E_i):  # 这是第二选择-启发式方法并计算E_j
@@ -120,7 +115,7 @@ def inner_loop(i, struct_operator):
     yi * f(i) == 1 and 0 < alpha < C(在边界上)
     yi * f(i) <= 1 and alpha = C(在边界内)
     """
-    if  (((struct_operator.matrix_labels[i].item() * E_i < - struct_operator.tolerance) and (struct_operator.alphas[i].item() < struct_operator.C)) or ((struct_operator.matrix_labels[i].item() * E_i > struct_operator.tolerance) and (struct_operator.alphas[i].item() > 0))):
+    if  (((struct_operator.matrix_labels[i] * E_i < - struct_operator.tolerance) and (struct_operator.alphas[i] < struct_operator.C)) or ((struct_operator.matrix_labels[i] * E_i > struct_operator.tolerance) and (struct_operator.alphas[i] > 0))):
         j, E_j = select_j(i, struct_operator, E_i)
         alpha_i_old = struct_operator.alphas[i].copy()
         alpha_j_old = struct_operator.alphas[j].copy()
@@ -140,18 +135,17 @@ def inner_loop(i, struct_operator):
         value_eta是alphas[j]的最优修改量,如果value_eta == 0,需要退出for循环的当前迭代过程;参考<<统计学习方法>>李航-P125~P128<序列最小最优化算法>
         """
         eta = struct_operator.x[i] - struct_operator.x[j]
-        # 用 .item() 提取数值标量，防止成为矩阵引发警告
-        value_eta = (- eta * eta.T).item()
+        value_eta = - eta * eta.T
         if value_eta >= 0:
             print('value_eta >= 0')
             return 0
-        struct_operator.alphas[j] -= struct_operator.matrix_labels[j].item() * (E_i - E_j) / value_eta # 计算出一个新的alphas[j]值
-        struct_operator.alphas[j] = clip_alpha(struct_operator.alphas[j].item(), H, L)
+        struct_operator.alphas[j] -= struct_operator.matrix_labels[j] * (E_i - E_j) / value_eta # 计算出一个新的alphas[j]值
+        struct_operator.alphas[j] = clip_alpha(struct_operator.alphas[j], H, L)
         update_E_k(struct_operator, j)  # 更新误差缓存
         if abs(struct_operator.alphas[j] - alpha_j_old) < 0.00001:
             print('j没多大变化')
             return 0
-        struct_operator.alphas[i] += struct_operator.matrix_labels[j].item() * struct_operator.matrix_labels[i].item() * (alpha_j_old.item() - struct_operator.alphas[j].item())    # alphas[i]和alphas[j]同样进行改变,虽然改变的大小一样,但是改变的方向正好相反
+        struct_operator.alphas[i] += struct_operator.matrix_labels[j] * struct_operator.matrix_labels[i] * (alpha_j_old - struct_operator.alphas[j])    # alphas[i]和alphas[j]同样进行改变,虽然改变的大小一样,但是改变的方向正好相反
         update_E_k(struct_operator, i)  # 更新误差缓存
         """
         在对alphas[i], alphas[j]进行优化之后,给这两个alphas值设置一个常数b
@@ -159,12 +153,11 @@ def inner_loop(i, struct_operator):
         所以:b1 - b = (y1 - y) - Σ[1~n] yi * (a1 - a) * (xi * x1)
         减两遍的原因:因为是减去Σ[1~n],正好2个变量i和j,所以减2遍
         """
-        # 用 .item() 提取数值标量
-        b1 = (struct_operator.b - E_i - struct_operator.matrix_labels[i].item() * (struct_operator.alphas[i].item() - alpha_i_old.item()) * (struct_operator.x[i] * struct_operator.x[i].T) - struct_operator.matrix_labels[j].item() * (struct_operator.alphas[j].item() - alpha_j_old.item()) * (struct_operator.x[i] * struct_operator.x[j].T)).item()
-        b2 = (struct_operator.b - E_j - struct_operator.matrix_labels[i].item() * (struct_operator.alphas[i].item() - alpha_i_old.item()) * (struct_operator.x[i] * struct_operator.x[j].T) - struct_operator.matrix_labels[j].item() * (struct_operator.alphas[j].item() - alpha_j_old.item()) * (struct_operator.x[j] * struct_operator.x[j].T)).item()
-        if (0 < struct_operator.alphas[i].item()) and (struct_operator.C > struct_operator.alphas[i].item()):
+        b1 = struct_operator.b - E_i - struct_operator.matrix_labels[i] * (struct_operator.alphas[i] - alpha_i_old) * (struct_operator.x[i] * struct_operator.x[i].T) - struct_operator.matrix_labels[j] * (struct_operator.alphas[j] - alpha_j_old) * (struct_operator.x[i] * struct_operator.x[j].T)
+        b2 = struct_operator.b - E_j - struct_operator.matrix_labels[i] * (struct_operator.alphas[i] - alpha_i_old) * (struct_operator.x[i] * struct_operator.x[j].T) - struct_operator.matrix_labels[j] * (struct_operator.alphas[j] - alpha_j_old) * (struct_operator.x[j] * struct_operator.x[j].T)
+        if (0 < struct_operator.alphas[i]) and (struct_operator.C > struct_operator.alphas[i]):
             struct_operator.b = b1
-        elif (0 < struct_operator.alphas[j].item()) and (struct_operator.C > struct_operator.alphas[j].item()):
+        elif (0 < struct_operator.alphas[j]) and (struct_operator.C > struct_operator.alphas[j]):
             struct_operator.b = b2
         else:
             struct_operator.b = (b1 + b2) / 2.0
@@ -239,7 +232,7 @@ def plot_figure_SVM(matrix_x, matrix_y, ws, b, alphas):
     """
     mx = mat(matrix_x)
     my = mat(matrix_y)
-    vb = b    # 【已修改】因为现在b已经是普通的标量数字了，不需要再 array(b)[0]
+    vb = array(b)[0]    # b原来是矩阵,先转为数组类型后其数组大小为(1,1),所以后面加[0],变为1
     figure = plt.figure()
     sp = figure.add_subplot(111)
     sp.scatter(mx[:, 0].flatten().A[0], mx[:, 1].flatten().A[0])    # 注意flatten的用法
@@ -260,9 +253,7 @@ def plot_figure_SVM(matrix_x, matrix_y, ws, b, alphas):
     plt.show()
 
 if __name__ == '__main__':
-    # 动态拼接数据文件的绝对路径
-    data_path = os.path.join(current_dir, '6.SVM', 'testSet.txt')
-    array_data, array_labels = load_data_set(data_path) # 获取特征和目标变量
+    array_data, array_labels = load_data_set('./6.SVM/testSet.txt') # 获取特征和目标变量
     b, alphas = SMO_perfect(array_data, array_labels, 0.6, 0.001, 40)    # b是常量值,alphas是拉格朗日乘子
     print('b = ',b)
     print('alphas[alphas > 0] = ', alphas[ alphas > 0])

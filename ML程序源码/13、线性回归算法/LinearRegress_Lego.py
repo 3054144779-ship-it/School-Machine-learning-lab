@@ -1,5 +1,6 @@
 from numpy import *
 from bs4 import BeautifulSoup
+from numpy import asmatrix as mat
 
 def load_data_from_page(file_in, year, num_piece, price_origin, x_return, y_return):
     """

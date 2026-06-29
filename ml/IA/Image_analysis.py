@@ -8,7 +8,7 @@ class ImageBatchProcessor:
     # 初始化密钥
     def __init__(self, app_id, api_key, secret_key, folder_path="image"):
         self.client = AipImageClassify(app_id, api_key, secret_key)
-        self.folder_path = folder_path 
+        self.folder_path = folder_path  
         self.image_exts = (".jpg", ".jpeg", ".png", ".bmp")
 
     # 读取单个文件

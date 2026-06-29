@@ -48,18 +48,6 @@ pip -verson
 pip install opencv-python
 ```
 
-###安装`html5lib`:
-
-```cmd
-pip install html5lib
-```
-
-###安装`feedparser`:
-
-```cmd
-pip install feedparser
-```
-
 ## lab1 语音识别(01)：
 
 技术文档：[语音技术](https://ai.baidu.com/ai-doc/SPEECH/0lbxfnc9b)(左侧SDK文档 $\rightarrow$ 语音识别 $\rightarrow$ API-PythonSDK)。
@@ -86,3 +74,8 @@ Matplotlib 文档技术文档:[快速入门指南 — Matplotlib 3.10.3 文档 -
 
 小问题注意：numpy2.0版本后弃用了了`mat`等，大多数不常用不安全的函数
 
+可能会用到:
+
+`hasattr(object, name)`:检查一个对象是否存在一个属性
+
+`Object.name`:强制给对象挂载一个属性

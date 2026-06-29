@@ -1,8 +1,5 @@
 from numpy import *
-import os
 import matplotlib.pyplot as plt
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
 
 def kernel_transform(matrix_data_input, matrix_data_input_no_i, k_tupple):  # 计算内核或将数据转换到更高维度的空间
     """
@@ -20,7 +17,7 @@ def kernel_transform(matrix_data_input, matrix_data_input_no_i, k_tupple):  # �
             matrix_k[j] = delta_row * delta_row.T
         matrix_k = exp(matrix_k / (-1 * k_tupple[1] ** 2))  # 径向基函数的高斯版本;在Numpy中的除法是元素方面的,而不像matlab那样是矩阵的
     else:
-        raise NameError('出现问题:此内核无法被识别')
+        raise NameError('出现问题F:此内核无法被识别')
     return  matrix_k
 
 class struct_operate:
@@ -68,8 +65,7 @@ def calculate_E_k(struct_operator, k):
     args:struct_operator:struct_operate对象;k:具体某一行
     returns:E_k:预测结果与真实结果比对,即计算误差
     """
-    # 强制转换为float，避免返回1x1的matrix导致后续塞入数组时报错
-    fx_k = float((multiply(struct_operator.alphas, struct_operator.matrix_labels)).T * (struct_operator.x * struct_operator.x[k].T)) + float(struct_operator.b)
+    fx_k = (multiply(struct_operator.alphas, struct_operator.matrix_labels)).T * (struct_operator.x * struct_operator.x[k].T) + struct_operator.b
     E_k = fx_k - float(struct_operator.matrix_labels[k])
     return E_k
 
@@ -169,8 +165,7 @@ def inner_loop(i, struct_operator):
         value_eta是alphas[j]的最优修改量,如果value_eta == 0,需要退出for循环的当前迭代过程;参考<<统计学习方法>>李航-P125~P128<序列最小最优化算法>
         """
         eta = struct_operator.x[i] - struct_operator.x[j]
-        # 用float包裹，防止生成1x1 matrix导致后续判断异常
-        value_eta = float(- eta * eta.T)
+        value_eta = - eta * eta.T
         if value_eta >= 0:
             print('value_eta >= 0')
             return 0
@@ -188,10 +183,8 @@ def inner_loop(i, struct_operator):
         所以:b1 - b = (y1 - y) - Σ[1~n] yi * (a1 - a) * (xi * x1)
         减两遍的原因:因为是减去Σ[1~n],正好2个变量i和j,所以减2遍
         """
-        # 计算b1和b2时用float提取标量，防止b变成matrix而引发连锁报错
-        b1 = float(struct_operator.b - E_i - struct_operator.matrix_labels[i] * (struct_operator.alphas[i] - alpha_i_old) * (struct_operator.x[i] * struct_operator.x[i].T) - struct_operator.matrix_labels[j] * (struct_operator.alphas[j] - alpha_j_old) * (struct_operator.x[i] * struct_operator.x[j].T))
-        b2 = float(struct_operator.b - E_j - struct_operator.matrix_labels[i] * (struct_operator.alphas[i] - alpha_i_old) * (struct_operator.x[i] * struct_operator.x[j].T) - struct_operator.matrix_labels[j] * (struct_operator.alphas[j] - alpha_j_old) * (struct_operator.x[j] * struct_operator.x[j].T))
-
+        b1 = struct_operator.b - E_i - struct_operator.matrix_labels[i] * (struct_operator.alphas[i] - alpha_i_old) * (struct_operator.x[i] * struct_operator.x[i].T) - struct_operator.matrix_labels[j] * (struct_operator.alphas[j] - alpha_j_old) * (struct_operator.x[i] * struct_operator.x[j].T)
+        b2 = struct_operator.b - E_j - struct_operator.matrix_labels[i] * (struct_operator.alphas[i] - alpha_i_old) * (struct_operator.x[i] * struct_operator.x[j].T) - struct_operator.matrix_labels[j] * (struct_operator.alphas[j] - alpha_j_old) * (struct_operator.x[j] * struct_operator.x[j].T)
         if (0 < struct_operator.alphas[i]) and (struct_operator.C > struct_operator.alphas[i]):
             struct_operator.b = b1
         elif (0 < struct_operator.alphas[j]) and (struct_operator.C > struct_operator.alphas[j]):
@@ -263,7 +256,7 @@ def calculate_ws(alphas, array_data, labels_class):
     return w
 
 def test_kernel_rbf(k1 = 1.3):
-    array_data_train, array_labels_train = load_data_set(os.path.join(current_dir, '6.SVM', 'testSetRBF.txt'))
+    array_data_train, array_labels_train = load_data_set('./6.SVM/testSetRBF.txt')
     b, alphas = SMO_perfect(array_data_train, array_labels_train, 200, 0.0001, 10000, ('rbf', k1))   # C=200十分重要
     matrix_data_train = mat(array_data_train)
     matrix_labels_train = mat(array_labels_train).T
@@ -279,7 +272,7 @@ def test_kernel_rbf(k1 = 1.3):
         if sign(predict_train) != sign(array_labels_train[i]):
             count_train_error += 1
     print('训练错误率:%f' % (float(count_train_error) / m_train))
-    array_data_test, array_labels_test = load_data_set(os.path.join(current_dir, '6.SVM', 'testSetRBF2.txt'))
+    array_data_test, array_labels_test = load_data_set('./6.SVM/testSetRBF2.txt')
     count_test_error = 0
     matrix_data_test = mat(array_data_test)
     matrix_labels_test = mat(array_labels_test)
@@ -316,11 +309,11 @@ def load_images(name_directory):
             labels_hw.append(-1)
         else:
             labels_hw.append(1)
-        matrix_file[i, :] = image2vector(os.path.join(name_directory, str_name_file))
+        matrix_file[i, :] = image2vector("%s/%s" % (name_directory, str_name_file))
     return matrix_file, labels_hw
 
 def test_digits(k_tupple = ('rbf', 10)):
-    array_data_train, array_labels_train = load_images(os.path.join(current_dir, '6.SVM', 'trainingDigits'))  # 导入训练数据
+    array_data_train, array_labels_train = load_images('./6.SVM/trainingDigits')  # 导入训练数据
     b, alphas = SMO_perfect(array_data_train, array_labels_train, 200, 0.0001, 10000, k_tupple)   # C=200十分重要
     matrix_data_train = mat(array_data_train)
     matrix_labels_train = mat(array_labels_train).T
@@ -337,7 +330,7 @@ def test_digits(k_tupple = ('rbf', 10)):
         if sign(predict_train) != sign(array_labels_train[i]):
             count_train_error += 1
     print('训练错误率:%f' % (float(count_train_error) / m_train))
-    array_data_test, array_labels_test = load_images(os.path.join(current_dir, '6.SVM', 'testDigits'))
+    array_data_test, array_labels_test = load_images('./6.SVM/testDigits')
     count_test_error = 0
     matrix_data_test = mat(array_data_test)
     matrix_labels_test = mat(array_labels_test)

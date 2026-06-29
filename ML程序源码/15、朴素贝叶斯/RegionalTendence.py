@@ -63,23 +63,8 @@ def local_words(feed_1, feed_0):
     获取训练数据和测试数据
     """
     import random
-
-    total_docs = 2 * len_min
-
-    # 动态决定测试集大小：如果总数大于等于20，就取20个；如果少于20个，就取总数的 30%
-    if total_docs >= 20:
-        num_test = 20
-    else:
-        num_test = int(total_docs * 0.3)
-
-    # 防止因为数据太少导致测试集为0（后续计算错误率除以0会报错）
-    if num_test == 0 and total_docs > 0:
-        num_test = 1
-
-    # 动态抽取 num_test 个样本
-    set_test = [int(number) for number in random.sample(range(total_docs), num_test)]
-    set_train = list(set(range(total_docs)) - set(set_test))
-
+    set_test = [int(number) for number in random.sample(range(2 * len_min), 20)]    # 生成随机取10个数,为了避免警告将每个数都转换为整型
+    set_train = list(set(range(2 * len_min)) - set(set_test))   # 在原来的set_train中去掉这10个数
     """
     把这些训练集和测试集变成向量的形式
     """
@@ -99,14 +84,14 @@ def local_words(feed_1, feed_0):
 
 def test_rss():
     import feedparser
-    ny = feedparser.parse('https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/section/world/rss.xml')
-    sf = feedparser.parse('https://feeds.skynews.com/feeds/rss/world.xml')
+    ny = feedparser.parse('http://newyork.craigslist.org/stp/index.rss')
+    sf = feedparser.parse('http://sfbay.craigslist.org/stp/index.rss')
     list_vocabulary, p_sf, p_ny = local_words(ny, sf)
 
 def get_top_words():
     import feedparser
-    ny = feedparser.parse('https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/section/world/rss.xml')
-    sf = feedparser.parse('https://feeds.skynews.com/feeds/rss/world.xml')
+    ny = feedparser.parse('http://newyork.craigslist.org/stp/index.rss')
+    sf = feedparser.parse('http://sfbay.craigslist.org/stp/index.rss')
     list_vocabulary, p_sf, p_ny = local_words(ny, sf)
     ny_top = []
     sf_top = []

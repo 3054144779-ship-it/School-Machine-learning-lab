@@ -1,5 +1,6 @@
 from numpy import *
 import matplotlib.pylab as plt
+from numpy import asmatrix as mat
 
 def load_data_set(file_name):
     """

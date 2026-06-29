@@ -1,5 +1,6 @@
 from numpy import *
 from bs4 import BeautifulSoup
+from numpy import asmatrix as mat
 
 # 从页面读取数据，生成retX和retY列表
 def scrapePage(retX, retY, inFile, yr, numPce, origPrc):
