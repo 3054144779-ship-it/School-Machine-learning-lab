@@ -1,8 +1,10 @@
 import os
+import json
+import joblib
 import pandas as pd
 from sklearn.model_selection import train_test_split # 数据集划分工具
 from Data import Data
-from Algorithm import Algorithm 
+from Algorithm import Algorithm
 
 # 获取当前文件位置
 base_path = os.path.dirname(__file__)
@@ -59,7 +61,7 @@ def main():
     
     print("\n开始训练模型...")
     algo = Algorithm()
-    
+
     # 训练模型 
     algo.fit(X_train, y_train_reg, y_train_clf) # 连续值 y 和 分类值 y
     
@@ -67,8 +69,25 @@ def main():
     # 评估模型 A：多元线性回归 
     algo.LinearRegression_assessment(X_test, y_test_reg)
     
-    # 评估模型 B：分类决策树 
+    # 评估模型 B：分类决策树
     algo.tree_assessment(X_test, y_test_clf)
+
+    # 保存模型和元数据，供 api.py 使用
+    model_dir = os.path.join(base_path, "saved_models")
+    os.makedirs(model_dir, exist_ok=True)
+
+    joblib.dump(algo.lr, os.path.join(model_dir, "lr_model.pkl"))
+    joblib.dump(algo.clf, os.path.join(model_dir, "clf_model.pkl"))
+
+    metadata = {
+        "feature_names": algo.feature_names if algo.feature_names else X.columns.tolist(),
+        "target_col": target_col,
+        "class_labels": labels
+    }
+    with open(os.path.join(model_dir, "model_metadata.json"), "w", encoding="utf-8") as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=2)
+
+    print(f"\n模型已保存到: {model_dir}")
 
 if __name__ == "__main__":
     main()

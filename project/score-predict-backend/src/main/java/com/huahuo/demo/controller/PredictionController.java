@@ -6,7 +6,6 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -21,17 +20,26 @@ public class PredictionController {
     }
 
     @PostMapping("/predict")
-    public ResponseEntity<Map<String,Object>> predict(@Valid @RequestBody PredictionRequest request){
-        // 调用 Service 层进行预测
-        Double finalGrade = predictionService.predictFinalGrade(request);
-
-        // 封装统一的返回格式
-        Map<String, Object> response = new HashMap<>();
-        response.put("code", 200);
-        response.put("message", "预测成功");
-        response.put("predictedGrade", finalGrade);
-
-        return ResponseEntity.ok(response);
+    public ResponseEntity<Map<String, Object>> predict(@Valid @RequestBody PredictionRequest request) {
+        Map<String, Object> result = predictionService.predict(request);
+        return ResponseEntity.ok(result);
     }
 
+    @GetMapping("/features")
+    public ResponseEntity<Map<String, Object>> features() {
+        Map<String, Object> result = predictionService.getFeatures();
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/analysis")
+    public ResponseEntity<Map<String, Object>> analysis() {
+        Map<String, Object> result = predictionService.getAnalysis();
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/tree")
+    public ResponseEntity<Map<String, Object>> tree() {
+        Map<String, Object> result = predictionService.getTree();
+        return ResponseEntity.ok(result);
+    }
 }
