@@ -27,8 +27,26 @@ def main():
     print("开始清洗数据...")
     df = data.data_show(range_limit)
     
+    # ========== 独热编码实践 ==========
+    # 将 "线下_互动" 数值列转换为类别特征 "参与度等级"，展示独热编码流程
+    if "线下_互动" in df.columns:
+        print("\n--- 独热编码 (One-Hot Encoding) ---")
+        print("将 '线下_互动' 数值列转换为类别特征 '参与度等级' (低/中/高)")
+        bins_interact = [-1, 40, 70, 101]
+        labels_interact = ["低参与度", "中参与度", "高参与度"]
+        df["参与度等级"] = pd.cut(df["线下_互动"], bins=bins_interact, labels=labels_interact)
+        print(f"类别分布: {df['参与度等级'].value_counts().to_dict()}")
+
+        # 对类别特征执行独热编码
+        feature_limit = ["参与度等级"]
+        dummies = pd.get_dummies(df[feature_limit], prefix=feature_limit)
+        df = pd.concat([df, dummies], axis=1)
+        df.drop(columns=feature_limit, inplace=True)
+        print(f"独热编码后新增列: {list(dummies.columns)}")
+    # ====================================
+
     print("\n开始特征选择...")
-    # feature_choose 会返回筛选后的完整 DataFrame 
+    # feature_choose 会返回筛选后的完整 DataFrame
     target_col = "线上总成绩"
     final_df = data.feature_choose(df, target_col)
 

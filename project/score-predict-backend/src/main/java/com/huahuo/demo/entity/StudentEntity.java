@@ -11,21 +11,27 @@ import jakarta.persistence.*;
 public class StudentEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY) // 主键自增
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "attendance")
-    private Double attendance;     // 出勤率
+    @Column(name = "student_name")
+    private String studentName;          // 学生姓名
 
-    @Column(name = "homework")
-    private Double homework;       // 作业分
+    @Column(name = "interaction")
+    private Double interaction;          // 线下_互动
 
-    @Column(name = "midterm")
-    private Double midterm;        // 期中分
+    @Column(name = "comprehensive_regular")
+    private Double comprehensiveRegular; // 综合_平时成绩
 
-    @Column(name = "participation")
-    private Integer participation; // 课堂参与度
+    @Column(name = "final_total")
+    private Double finalTotal;           // 期末总成绩
 
-    @Column(name = "final_grade")
-    private Double finalGrade;     // 期末真实成绩（用于模型训练的历史数据）
+    @Column(name = "regular_score")
+    private Double regularScore;         // 平时成绩
+
+    @Column(name = "final_score")
+    private Double finalScore;           // 期末成绩
+
+    @Column(name = "online_total")
+    private Double onlineTotal;          // 线上总成绩（目标变量）
 }

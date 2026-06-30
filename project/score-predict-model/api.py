@@ -29,6 +29,30 @@ except Exception as e:
 FEATURE_NAMES = metadata.get("feature_names", [])
 CLASS_LABELS = metadata.get("class_labels", ["不及格", "中", "良", "优"])
 
+# 前端展示用的原始特征名（5个数值型，不含独热编码列）
+DISPLAY_FEATURES = [f for f in FEATURE_NAMES if "参与度等级" not in f]
+
+# 预计算索引，用于在预测时自动补充独热编码特征
+_HAS_ONEHOT = any("参与度等级" in f for f in FEATURE_NAMES)
+_INTERACTION_IDX = DISPLAY_FEATURES.index("线下_互动") if "线下_互动" in DISPLAY_FEATURES else 0
+
+
+def _build_features(raw_features: list[float]) -> np.ndarray:
+    """将前端传入的原始 5 个特征扩展为模型期望的完整特征向量（含独热编码）"""
+    X = np.array([raw_features], dtype=float)
+    if not _HAS_ONEHOT:
+        return X
+    # 根据 线下_互动 值推导参与度等级并独热编码
+    interact_val = raw_features[_INTERACTION_IDX]
+    if interact_val <= 40:
+        medium, high = 0, 0  # 低参与度（参考类别）
+    elif interact_val <= 70:
+        medium, high = 1, 0  # 中参与度
+    else:
+        medium, high = 0, 1  # 高参与度
+    onehot = np.array([[medium, high]], dtype=float)
+    return np.concatenate([X, onehot], axis=1)
+
 
 class PredictRequest(BaseModel):
     features: list[float]
@@ -36,13 +60,13 @@ class PredictRequest(BaseModel):
 
 @app.get("/api/features")
 def get_features():
-    """返回模型期望的特征名称和顺序"""
+    """返回前端可用的特征名称（原始数值特征，不含独热编码列）"""
     if not FEATURE_NAMES:
         raise HTTPException(status_code=500, detail="模型未加载")
     return {
         "code": 200,
         "data": {
-            "feature_names": FEATURE_NAMES,
+            "feature_names": DISPLAY_FEATURES,
             "class_labels": CLASS_LABELS
         }
     }
@@ -52,16 +76,16 @@ def get_features():
 def predict_score(req: PredictRequest):
     if lr_model is None or clf_model is None:
         raise HTTPException(status_code=500, detail="模型未加载，请先运行 main.py 训练模型")
-    if len(req.features) != len(FEATURE_NAMES):
+    if len(req.features) != len(DISPLAY_FEATURES):
         raise HTTPException(
             status_code=400,
-            detail=f"特征数量不匹配，期望 {len(FEATURE_NAMES)} 个: {FEATURE_NAMES}"
+            detail=f"特征数量不匹配，期望 {len(DISPLAY_FEATURES)} 个: {DISPLAY_FEATURES}"
         )
 
-    X = np.array([req.features])
+    X = _build_features(req.features)
 
-    # 线性回归预测连续分数
-    score_reg = float(lr_model.predict(X)[0])
+    # 线性回归预测连续分数，裁剪至 [0, 100] 区间
+    score_reg = float(np.clip(lr_model.predict(X)[0], 0.0, 100.0))
     # 决策树预测分类等级
     label_clf = str(clf_model.predict(X)[0])
 

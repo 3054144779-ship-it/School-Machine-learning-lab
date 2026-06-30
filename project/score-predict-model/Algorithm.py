@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier                                   # 分类决策树
 from sklearn.linear_model import LinearRegression                                 # 多元线性回归
-from sklearn.metrics import accuracy_score, confusion_matrix                      # 准确率 混淆矩阵
-from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error     # R² MAE RMSE
+from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, recall_score   # 准确率 混淆矩阵 精确率 召回率
+from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error                  # R² MAE RMSE
 
 class Algorithm:
     def __init__(self):
@@ -81,17 +81,21 @@ class Algorithm:
     def tree_assessment(self, X_test, y_test_clf):
         # 预测
         y_pred = self.clf.predict(X_test)
-        
+
         # 计算评估指标
         accuracy = accuracy_score(y_test_clf, y_pred)
         cm = confusion_matrix(y_test_clf, y_pred)
-        
+        precision = precision_score(y_test_clf, y_pred, average='weighted', zero_division=0)
+        recall = recall_score(y_test_clf, y_pred, average='weighted', zero_division=0)
+
         print("\n" + "="*30)
         print(" 模型 B (分类决策树) 评估结果")
         print("="*30)
         print(f"准确率 (Accuracy): {accuracy * 100:.2f}%")
+        print(f"精确率 (Precision - weighted): {precision:.4f}")
+        print(f"召回率 (Recall - weighted): {recall:.4f}")
         print("混淆矩阵 (Confusion Matrix):")
         print(cm)
-        
-        return accuracy, cm
+
+        return accuracy, cm, precision, recall
     

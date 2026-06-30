@@ -5,6 +5,11 @@ const api = axios.create({
   timeout: 10000,
 })
 
+const studentApi = axios.create({
+  baseURL: '/api/students',
+  timeout: 10000,
+})
+
 export function getFeatures() {
   return api.get('/features')
 }
@@ -19,4 +24,8 @@ export function getAnalysis() {
 
 export function getTree() {
   return api.get('/tree')
+}
+
+export function getStudentHistory() {
+  return studentApi.get('/history')
 }
