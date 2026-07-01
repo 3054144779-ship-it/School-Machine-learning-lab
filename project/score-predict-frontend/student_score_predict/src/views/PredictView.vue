@@ -11,7 +11,7 @@ const result = ref(null)
 // 滑块值，key 为特征名
 const sliders = reactive({})
 
-onMounted(async () => {
+async function loadFeatures() {
   loading.value = true
   error.value = ''
   try {
@@ -20,7 +20,15 @@ onMounted(async () => {
       featureNames.value = res.data.data.feature_names || []
       // 初始化每个滑块为中间值
       featureNames.value.forEach(name => {
-        sliders[name] = 50
+        if (!(name in sliders)) {
+          sliders[name] = 50
+        }
+      })
+      // 清除已移除的特征
+      Object.keys(sliders).forEach(key => {
+        if (!featureNames.value.includes(key)) {
+          delete sliders[key]
+        }
       })
     } else {
       error.value = '加载特征信息失败'
@@ -30,10 +38,13 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(loadFeatures)
 
 async function handleSubmit() {
   submitting.value = true
+  error.value = ''
   result.value = null
   try {
     const values = featureNames.value.map(name => sliders[name])
@@ -41,9 +52,34 @@ async function handleSubmit() {
     if (res.data.code === 200 && res.data.data) {
       result.value = res.data.data
     } else {
-      error.value = res.data.message || '预测失败'
+      const msg = res.data.message || res.data.detail || '预测失败'
+      if (msg.includes('特征数量不匹配') || msg.includes('维特征') || msg.includes('刷新页面')) {
+        // 自动重载特征后重试一次
+        await loadFeatures()
+        const values2 = featureNames.value.map(name => sliders[name])
+        const res2 = await predict(values2)
+        if (res2.data.code === 200 && res2.data.data) {
+          result.value = res2.data.data
+        } else {
+          error.value = res2.data.message || res2.data.detail || '预测失败'
+        }
+        return
+      }
+      error.value = msg
     }
   } catch (e) {
+    const msg = e.response?.data?.detail || e.response?.data?.message || e.message
+    if (msg && (msg.includes('特征数量不匹配') || msg.includes('维特征') || msg.includes('刷新页面'))) {
+      await loadFeatures()
+      const values2 = featureNames.value.map(name => sliders[name])
+      const res2 = await predict(values2)
+      if (res2.data.code === 200 && res2.data.data) {
+        result.value = res2.data.data
+      } else {
+        error.value = res2.data?.message || res2.data?.detail || '预测失败'
+      }
+      return
+    }
     error.value = '预测请求失败，请检查 Python 预测服务是否启动'
   } finally {
     submitting.value = false

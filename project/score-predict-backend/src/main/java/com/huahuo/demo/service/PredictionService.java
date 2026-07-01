@@ -8,6 +8,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.LinkedHashMap;
@@ -27,11 +28,10 @@ public class PredictionService {
         this.restTemplate = restTemplate;
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public Map<String, Object> predict(PredictionRequest request) {
         log.info("接收到预测请求：{}", request);
 
-        // 将前端传入的 features 数组透传给 Python API
         Map<String, Object> pythonReq = new LinkedHashMap<>();
         pythonReq.put("features", request.getFeatures());
 
@@ -46,9 +46,17 @@ public class PredictionService {
             Map<String, Object> pythonResp = restTemplate.postForObject(url, entity, Map.class);
             log.info("Python API 响应: {}", pythonResp);
             return pythonResp;
-        } catch (Exception e) {
+        } catch (RestClientException e) {
             log.error("调用 Python API 失败: {}", e.getMessage());
-            throw new RuntimeException("预测服务暂时不可用，请确保 Python API 已启动", e);
+            // 尝试从 Python 响应中提取错误信息
+            String detail = e.getMessage();
+            try {
+                // 从异常消息中提取 JSON body
+                String bodyStr = detail.substring(detail.indexOf("\"detail\":\"") + 10);
+                bodyStr = bodyStr.substring(0, bodyStr.indexOf("\""));
+                detail = bodyStr;
+            } catch (Exception ignored) {}
+            return Map.of("code", 500, "message", "预测失败: " + detail);
         }
     }
 
@@ -84,6 +92,35 @@ public class PredictionService {
         } catch (Exception e) {
             log.error("获取决策树数据失败: {}", e.getMessage());
             return Map.of("code", 500, "message", "决策树服务暂时不可用");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getTrainOptions() {
+        String url = pythonApiUrl + "/api/train/options";
+        log.info("调用 Python API: {}", url);
+        try {
+            return restTemplate.getForObject(url, Map.class);
+        } catch (Exception e) {
+            log.error("获取训练选项失败: {}", e.getMessage());
+            return Map.of("code", 500, "message", "无法获取训练选项");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> train(Map<String, Object> config) {
+        String url = pythonApiUrl + "/api/train";
+        log.info("调用 Python API (训练): {}", url);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(config, headers);
+
+        try {
+            return restTemplate.postForObject(url, entity, Map.class);
+        } catch (Exception e) {
+            log.error("调用训练 API 失败: {}", e.getMessage());
+            return Map.of("code", 500, "message", "训练服务暂时不可用: " + e.getMessage());
         }
     }
 }

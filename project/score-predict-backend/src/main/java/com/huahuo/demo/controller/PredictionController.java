@@ -42,4 +42,16 @@ public class PredictionController {
         Map<String, Object> result = predictionService.getTree();
         return ResponseEntity.ok(result);
     }
+
+    @GetMapping("/train/options")
+    public ResponseEntity<Map<String, Object>> trainOptions() {
+        Map<String, Object> result = predictionService.getTrainOptions();
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/train")
+    public ResponseEntity<Map<String, Object>> train(@RequestBody Map<String, Object> config) {
+        Map<String, Object> result = predictionService.train(config);
+        return ResponseEntity.ok(result);
+    }
 }

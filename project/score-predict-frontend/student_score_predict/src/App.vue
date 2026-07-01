@@ -8,6 +8,7 @@ const activeMenu = computed(() => route.path)
 const menuItems = [
   { path: '/predict', label: '个体预测', icon: '📊' },
   { path: '/analysis', label: '总体分析', icon: '📈' },
+  { path: '/train', label: '模型训练', icon: '⚙️' },
   { path: '/tree', label: '模型可视化', icon: '🌳' },
   { path: '/history', label: '历史数据', icon: '📋' },
 ]

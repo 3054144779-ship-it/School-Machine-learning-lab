@@ -26,6 +26,14 @@ export function getTree() {
   return api.get('/tree')
 }
 
+export function getTrainOptions() {
+  return api.get('/train/options')
+}
+
+export function train(config) {
+  return api.post('/train', config, { timeout: 60000 })
+}
+
 export function getStudentHistory() {
   return studentApi.get('/history')
 }

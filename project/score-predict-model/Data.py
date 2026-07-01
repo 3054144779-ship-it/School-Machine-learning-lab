@@ -48,7 +48,7 @@ class Data :
         
         # 生成类别特征（仅在 feature_limit 非空时执行）
         if feature_limit:
-            dummies = pd.get_dummies(df[feature_limit], prefix=feature_limit)
+            dummies = pd.get_dummies(df[feature_limit], prefix=feature_limit, drop_first=True)
             '''
             concat 拼接函数，用来合并多个 DataFrame 表格
             传入一个列表，代表要合并的两张表：
