@@ -96,8 +96,8 @@ public class PredictionService {
     }
 
     @SuppressWarnings("unchecked")
-    public Map<String, Object> getTrainOptions() {
-        String url = pythonApiUrl + "/api/train/options";
+    public Map<String, Object> getTrainOptions(String source) {
+        String url = pythonApiUrl + "/api/train/options?source=" + source;
         log.info("调用 Python API: {}", url);
         try {
             return restTemplate.getForObject(url, Map.class);

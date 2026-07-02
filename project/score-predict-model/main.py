@@ -5,6 +5,7 @@ import argparse
 import joblib
 import pandas as pd
 import numpy as np
+import pymysql
 from sklearn.model_selection import train_test_split
 from Data import Data
 from Algorithm import Algorithm
@@ -13,7 +14,26 @@ base_path = os.path.dirname(__file__)
 input_path = os.path.join(base_path, 'data', 'Score_dataset.xlsx')
 output_path = os.path.join(base_path, 'data_show', 'result.json')
 
-# 默认训练配置
+DB_CONFIG = {
+    "host": "127.0.0.1",
+    "user": "root",
+    "password": "root123456",
+    "database": "student_predict",
+    "charset": "utf8mb4",
+}
+
+# DB 列名 → Excel 中文列名
+DB_TO_EXCEL_MAP = {
+    "interaction": "线下_互动",
+    "offline_final_exam": "线下_期末考试",
+    "offline_total": "线下总成绩",
+    "comprehensive_regular": "综合_平时成绩",
+    "final_total": "期末总成绩",
+    "regular_score": "平时成绩",
+    "final_score": "期末成绩",
+    "online_total": "线上总成绩",
+}
+
 DEFAULT_CONFIG = {
     "target_col": "线上总成绩",
     "test_size": 0.2,
@@ -26,40 +46,16 @@ DEFAULT_CONFIG = {
         "线上_期末考试": [0, 40],
         "线上总成绩": [0, 100]
     },
-    # 手动指定特征列表，为 null 时自动按相关性阈值选择
     "feature_names": None,
-    # 分类等级划分
     "class_bins": [-1, 59.9, 79.9, 89.9, 101],
     "class_labels": ["不及格", "中", "良", "优"]
 }
 
 
-def train_model(config: dict = None) -> dict:
-    """
-    参数化训练模型
-
-    支持的 config 字段:
-        - target_col: 目标列名
-        - test_size: 测试集比例 (0.0~1.0)
-        - random_state: 随机种子
-        - max_depth: 决策树最大深度
-        - correlation_threshold: 特征选择相关性阈值
-        - range_limit: 数据清洗范围 dict
-        - feature_names: 手动指定特征列表，null 则自动选择
-        - class_bins: 分类等级区间
-        - class_labels: 分类等级标签
-
-    :return: 包含训练结果、评估指标、特征重要性等信息的 dict
-    """
-    if config is None:
-        config = {}
+def _train_from_dataframe(df: pd.DataFrame, config: dict) -> dict:
+    """从已加载的 DataFrame 执行完整的训练管线（独热编码→特征选择→训练→评估→保存）"""
     cfg = {**DEFAULT_CONFIG, **config}
-
-    # ---- 数据层 ----
     data = Data(input_path, output_path)
-
-    print("开始清洗数据...")
-    df = data.data_show(cfg["range_limit"])
 
     # ---- 独热编码 ----
     if "线下_互动" in df.columns:
@@ -79,9 +75,7 @@ def train_model(config: dict = None) -> dict:
     target_col = cfg["target_col"]
 
     if cfg["feature_names"] is not None:
-        # 手动指定特征，跳过自动特征选择
         selected = list(cfg["feature_names"])
-        # 如果选了 线下_互动，自动补上独热编码列
         if "线下_互动" in selected:
             onehot_cols = [c for c in df.columns if c.startswith("参与度等级_")]
             for oh in onehot_cols:
@@ -98,12 +92,31 @@ def train_model(config: dict = None) -> dict:
         print("\n开始自动特征选择...")
         final_df = data.feature_choose(df, target_col, cfg["correlation_threshold"])
 
-    # 剔除共线特征
+    # 剔除已知共线特征（数据泄漏）
     leakage_cols = ["线上_平时成绩", "线上_期中测试", "线上_期末考试"]
     existing_leakage = [c for c in leakage_cols if c in final_df.columns]
     if existing_leakage:
         print(f"\n剔除共线特征: {existing_leakage}")
         final_df = final_df.drop(columns=existing_leakage)
+
+    # 自动检测并剔除高相关特征对（|r| > 0.95），保留与目标更相关的那个
+    feature_cols = [c for c in final_df.columns if c != target_col]
+    if len(feature_cols) >= 2:
+        feature_corr = final_df[feature_cols].corr().abs()
+        to_drop = set()
+        for i in range(len(feature_cols)):
+            for j in range(i + 1, len(feature_cols)):
+                if feature_corr.iloc[i, j] > 0.95:
+                    a, b = feature_cols[i], feature_cols[j]
+                    if a in to_drop or b in to_drop:
+                        continue
+                    corr_a = abs(final_df[a].corr(final_df[target_col]))
+                    corr_b = abs(final_df[b].corr(final_df[target_col]))
+                    drop = a if corr_a <= corr_b else b
+                    to_drop.add(drop)
+                    print(f"剔除高相关特征: {drop} (与 {a if drop != a else b} 相关系数 {feature_corr.iloc[i, j]:.4f})")
+        if to_drop:
+            final_df = final_df.drop(columns=list(to_drop))
 
     print(f"\n最终使用的特征 ({len(final_df.columns) - 1} 个): {[c for c in final_df.columns if c != target_col]}")
 
@@ -124,7 +137,6 @@ def train_model(config: dict = None) -> dict:
     algo = Algorithm(max_depth=cfg["max_depth"], random_state=cfg["random_state"])
     algo.fit(X_train, y_train_reg, y_train_clf)
 
-    # 评估并收集结构化结果
     lr_metrics = algo.LinearRegression_assessment(X_test, y_test_reg)
     tree_metrics = algo.tree_assessment(X_test, y_test_clf)
 
@@ -178,16 +190,75 @@ def train_model(config: dict = None) -> dict:
     }
 
 
+def train_model(config: dict = None) -> dict:
+    """从 Excel 文件训练模型"""
+    if config is None:
+        config = {}
+    cfg = {**DEFAULT_CONFIG, **config}
+
+    data = Data(input_path, output_path)
+    print("开始清洗数据...")
+    df = data.data_show(cfg["range_limit"])
+
+    return _train_from_dataframe(df, cfg)
+
+
+def train_model_from_db(config: dict = None) -> dict:
+    """从 MySQL 数据库读取数据训练模型"""
+    if config is None:
+        config = {}
+    cfg = {**DEFAULT_CONFIG, **config}
+
+    conn = pymysql.connect(**DB_CONFIG)
+    try:
+        df = pd.read_sql("SELECT * FROM t_student_history", conn)
+    finally:
+        conn.close()
+
+    if df.empty:
+        raise ValueError("数据库 t_student_history 表为空，请先导入或手动录入数据")
+
+    # 去掉 id 和姓名列
+    df = df.drop(columns=[c for c in ["id", "student_name"] if c in df.columns])
+
+    # DB 列名映射为中文
+    df = df.rename(columns=DB_TO_EXCEL_MAP)
+
+    # 强制所有列转为数值类型（MySQL NULL 会使列变成 object，必须先转）
+    for c in df.columns:
+        df[c] = pd.to_numeric(df[c], errors='coerce')
+
+    # 填充缺失值：数值列用均值，文本列用众数（与 Data.data_show 一致）
+    for c in df.columns:
+        if df[c].isna().sum() == 0:
+            continue
+        if pd.api.types.is_numeric_dtype(df[c]):
+            df[c] = df[c].fillna(df[c].mean())
+        else:
+            mode_vals = df[c].mode()
+            df[c] = df[c].fillna(mode_vals[0] if not mode_vals.empty else '缺失')
+
+    # 应用 range_limit 过滤（仅对存在的列）
+    for col, (lo, hi) in cfg["range_limit"].items():
+        if col in df.columns:
+            df = df[(df[col] >= lo) & (df[col] <= hi)]
+
+    # 写入 result.json 供 /api/analysis 使用
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    df.to_json(output_path, orient="records", force_ascii=False)
+
+    print(f"从数据库读取 {len(df)} 条数据，列: {list(df.columns)}")
+    return _train_from_dataframe(df, cfg)
+
+
 def get_available_features() -> dict:
-    """返回数据集中所有可用的数值特征列表，供前端选择"""
+    """返回 Excel 数据集中所有可用的数值特征列表"""
     df = pd.read_excel(input_path)
     numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
 
-    # 排除明显是目标变量的列和共线特征
     exclude = ["线上_平时成绩", "线上_期中测试", "线上_期末考试"]
     selectable = [c for c in numeric_cols if c not in exclude]
 
-    # 额外可用的类别特征
     categorical_hints = []
     if "线下_互动" in df.columns:
         categorical_hints.append({
@@ -195,6 +266,47 @@ def get_available_features() -> dict:
             "onehot_labels": ["参与度等级_低参与度", "参与度等级_中参与度", "参与度等级_高参与度"],
             "description": "根据线下互动分数自动生成的参与度等级"
         })
+
+    return {
+        "numeric_features": selectable,
+        "categorical_features": categorical_hints,
+        "default_target": "线上总成绩",
+        "possible_targets": [c for c in numeric_cols if c not in exclude or c == "线上总成绩"],
+        "total_samples": len(df)
+    }
+
+
+def get_available_features_from_db() -> dict:
+    """返回数据库中所有可用的数值特征列表"""
+    conn = pymysql.connect(**DB_CONFIG)
+    try:
+        df = pd.read_sql("SELECT * FROM t_student_history", conn)
+    finally:
+        conn.close()
+
+    if df.empty:
+        return {
+            "numeric_features": [],
+            "categorical_features": [],
+            "default_target": "线上总成绩",
+            "possible_targets": ["线上总成绩"],
+            "total_samples": 0
+        }
+
+    df = df.drop(columns=[c for c in ["id", "student_name"] if c in df.columns])
+    df = df.rename(columns=DB_TO_EXCEL_MAP)
+    for c in df.columns:
+        df[c] = pd.to_numeric(df[c], errors='coerce')
+    numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+
+    exclude = ["线上_平时成绩", "线上_期中测试", "线上_期末考试"]
+    selectable = [c for c in numeric_cols if c not in exclude]
+
+    categorical_hints = [{
+        "source": "线下_互动",
+        "onehot_labels": ["参与度等级_低参与度", "参与度等级_中参与度", "参与度等级_高参与度"],
+        "description": "根据线下互动分数自动生成的参与度等级"
+    }] if "线下_互动" in df.columns else []
 
     return {
         "numeric_features": selectable,
@@ -214,11 +326,15 @@ def main():
     parser.add_argument("--random-state", type=int, default=None, help="随机种子")
     parser.add_argument("--correlation-threshold", type=float, default=None, help="特征选择相关性阈值")
     parser.add_argument("--show-features", action="store_true", help="仅显示可用特征列表")
+    parser.add_argument("--source", default="excel", choices=["excel", "db"], help="数据源: excel 或 db")
 
     args = parser.parse_args()
 
     if args.show_features:
-        info = get_available_features()
+        if args.source == "db":
+            info = get_available_features_from_db()
+        else:
+            info = get_available_features()
         print(json.dumps(info, ensure_ascii=False, indent=2))
         return
 
@@ -237,7 +353,7 @@ def main():
     if args.correlation_threshold is not None:
         config["correlation_threshold"] = args.correlation_threshold
 
-    result = train_model(config if config else None)
+    result = train_model_from_db(config if config else None) if args.source == "db" else train_model(config if config else None)
 
     print("\n" + "=" * 50)
     print("  训练完成 - 结果摘要")

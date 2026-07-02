@@ -26,8 +26,8 @@ export function getTree() {
   return api.get('/tree')
 }
 
-export function getTrainOptions() {
-  return api.get('/train/options')
+export function getTrainOptions(source = 'excel') {
+  return api.get('/train/options', { params: { source } })
 }
 
 export function train(config) {
@@ -36,4 +36,12 @@ export function train(config) {
 
 export function getStudentHistory() {
   return studentApi.get('/history')
+}
+
+export function addStudent(data) {
+  return studentApi.post('', data)
+}
+
+export function deleteStudent(id) {
+  return studentApi.delete(`/${id}`)
 }

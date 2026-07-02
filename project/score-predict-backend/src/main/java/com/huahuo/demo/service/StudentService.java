@@ -15,10 +15,15 @@ public class StudentService {
         this.studentRepository = studentRepository;
     }
 
-    /**
-     * 获取所有学生历史数据，供前端分析面板绘制热力图和条形图
-     */
     public List<StudentEntity> getAllStudentHistory() {
         return studentRepository.findAll();
+    }
+
+    public StudentEntity saveStudent(StudentEntity student) {
+        return studentRepository.save(student);
+    }
+
+    public void deleteStudent(Long id) {
+        studentRepository.deleteById(id);
     }
 }

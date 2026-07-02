@@ -44,8 +44,9 @@ public class PredictionController {
     }
 
     @GetMapping("/train/options")
-    public ResponseEntity<Map<String, Object>> trainOptions() {
-        Map<String, Object> result = predictionService.getTrainOptions();
+    public ResponseEntity<Map<String, Object>> trainOptions(
+            @RequestParam(required = false, defaultValue = "excel") String source) {
+        Map<String, Object> result = predictionService.getTrainOptions(source);
         return ResponseEntity.ok(result);
     }
 

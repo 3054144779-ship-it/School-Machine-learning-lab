@@ -23,8 +23,8 @@ COLUMN_MAP = {
     "线上_期末考试": None,       # 共线特征，不导入
     "线上总成绩": "online_total",
     "线下_互动": "interaction",
-    "线下_期末考试": None,       # 不在特征列中，跳过
-    "线下总成绩": None,          # 不在特征列中，跳过
+    "线下_期末考试": "offline_final_exam",
+    "线下总成绩": "offline_total",
     "综合_平时成绩": "comprehensive_regular",
     "期末总成绩": "final_total",
     "平时成绩": "regular_score",

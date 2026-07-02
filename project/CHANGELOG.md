@@ -10,42 +10,35 @@
 ## [Unreleased]
 
 ### 新增
-
-- `TrainView.vue` — 模型训练界面，支持动态选择训练特征与超参数调优
-  （最大深度、最小样本分裂数、测试集比例）
-- `api.py` 新增 `POST /train` 端点 — 接收特征列表与超参数，返回结构化评估指标
-- `api.py` 新增 `GET /features/available` 端点 — 暴露所有可训练的特征列
-- `api.py` 新增 `GET /evaluate` 端点 — 返回当前模型评估指标 JSON
-- `import_to_db.py` — 将 `Score_dataset.xlsx` 全部 7 页数据通过 SQLAlchemy
-  批量导入 MySQL
-- `start.bat` — 一键启动脚本（依次拉起 Python API → Spring Boot → Vite 开发服务器）
+- **手动录入学生数据**：`HistoryView.vue` 新增"添加学生"模态表单，支持逐条录入
+  学生信息（9 个字段），`StudentController` 新增 `POST /api/students` 和
+  `DELETE /api/students/{id}` 端点。
+- **数据库数据源训练**：`TrainView.vue` 新增 Excel/数据库数据源切换，
+  `main.py` 新增 `train_model_from_db()` 从 MySQL 读取数据进行训练，
+  `api.py` `/train` 和 `/train/options` 端点支持 `data_source` 参数。
+- `import_to_db.py` 新增 `线下_期末考试`、`线下总成绩` 两列导入，
+  实现 DB 与 Excel 训练特征集一致。
+- `StudentEntity` 新增 `offlineFinalExam`、`offlineTotal` 字段。
+- **Ridge 回归 + 自动共线性检测**：`Algorithm.py` 将 `LinearRegression` 替换为
+  `Ridge(alpha=1.0)`，L2 正则化压制多重共线性，权重分配更均衡。
+  `_train_from_dataframe()` 自动检测特征间 |r| > 0.95 的高相关对并剔除冗余特征。
 
 ### 修复
-- **数据泄漏**：`main.py` 将 `线上_平时成绩`、`线上_期中测试`、`线上_期末考试`
-  作为特征，而目标是 `线上总成绩`。三者求和恰好等于目标，导致 R² 虚高至 1.0。
-  现于特征工程阶段剔除与目标共线的子项。R² 1.0→0.8793，MAE 0→3.46。
-- **特征维度不匹配**：`reload_models()` 对模型文件与元数据的更新非原子操作，
-  导致 `DISPLAY_FEATURES` 推导出 N 列而 pickle 模型期望 M 列。
-  改为先写临时文件再原子重命名，加载后追加维度一致性断言。
-- **预测静默失败**：`PredictView.vue` 检测到维度不匹配后未重试预测，
-  用户点击后毫无反馈。现改为自动重载特征后静默重试一次。
-- **独热编码遗漏**：训练时选择类别型特征 `线下_互动` 未自动包含其独热编码
-  派生列，导致维度不匹配。已在 `/train` 处理逻辑中修复。
-- `PredictionService.java` 现在透传 Python API 的错误体到前端日志，
-  不再吞掉异常信息。
-- `RestTemplateConfig.java` 增加读写超时配置，防止长时间训练导致连接假死。
-- `HistoryView.vue` 本地存在但未被 git 追踪，导致其他机器克隆后编译失败
-  （对应提交 `e810804`）。
+- **DB 训练 NaN 错误**：`train_model_from_db()` 中 MySQL NULL 值导致 pandas
+  将列类型设为 `object`，`select_dtypes` 无法检测数值列，缺失值未被填充即进入
+  训练。改为先用 `pd.to_numeric()` 强制转换所有列为数值类型，再按均值/众数填充。
+- **模型权重失衡**：原 `LinearRegression` 在多重共线性下权重不稳定，期末成绩
+  权重 1.14、平时成绩权重 1.0 远超其他特征。Ridge 回归将期末成绩权重降至 0.76
+  （-33%）、平时成绩降至 0.62（-38%），特征间影响更均衡。
 
 ### 变更
-- `Algorithm.py`：评估方法（`evaluate_model`、`cross_validate`）改为返回
-  结构化 dict，不再直接打印到 stdout。
-- `api.py`：`reload_models()` 改为原子操作 —— 先写入临时文件再重命名，
-  加载后执行维度一致性校验。
-- `PredictView.vue`：特征维度处理逻辑抽取为公共函数 `loadFeatures()`；
-  维度不匹配时自动重试预测。
-- `Data.py` / `main.py`：列名适配清洗后的 Excel 表头
-  （`线上_平时成绩`、`线下_互动` 等）。
+- `main.py`：抽取 `_train_from_dataframe()` 共享训练管线，新增自动共线性检测。
+- `Algorithm.py`：`LinearRegression` → `Ridge(alpha=1.0)`。
+- `StudentController` / `StudentService`：新增学生记录的增删功能。
+- `PredictionController` / `PredictionService`：`trainOptions()` 新增
+  `source` 参数传递数据源类型。
+- `api/index.js`：新增 `addStudent()`、`deleteStudent()` 函数，
+  `getTrainOptions()` 支持 `source` 参数。
 
 ---
 

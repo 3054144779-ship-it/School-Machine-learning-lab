@@ -1,7 +1,7 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
-import { getStudentHistory } from '@/api/index.js'
+import { getStudentHistory, addStudent, deleteStudent } from '@/api/index.js'
 
 const loading = ref(false)
 const error = ref('')
@@ -14,9 +14,24 @@ const pagedData = computed(() => {
   return students.value.slice(start, start + pageSize)
 })
 
+const showAddModal = ref(false)
+const saving = ref(false)
+const formError = ref('')
+const form = reactive({
+  studentName: '',
+  interaction: null,
+  offlineFinalExam: null,
+  offlineTotal: null,
+  comprehensiveRegular: null,
+  finalTotal: null,
+  regularScore: null,
+  finalScore: null,
+  onlineTotal: null,
+})
+
 let distChart = null
 
-onMounted(async () => {
+async function refreshStudents() {
   loading.value = true
   error.value = ''
   try {
@@ -31,12 +46,67 @@ onMounted(async () => {
   } finally {
     loading.value = false
     if (students.value.length > 0) {
-      setTimeout(() => renderDistChart(), 100)
+      await nextTick()
+      renderDistChart()
     }
   }
-})
+}
 
+onMounted(() => { refreshStudents() })
 onUnmounted(() => { distChart?.dispose() })
+
+function openAddModal() {
+  formError.value = ''
+  form.studentName = ''
+  form.interaction = null
+  form.offlineFinalExam = null
+  form.offlineTotal = null
+  form.comprehensiveRegular = null
+  form.finalTotal = null
+  form.regularScore = null
+  form.finalScore = null
+  form.onlineTotal = null
+  showAddModal.value = true
+}
+
+async function handleAddSubmit() {
+  formError.value = ''
+  if (!form.studentName.trim()) {
+    formError.value = '请输入学生姓名'
+    return
+  }
+  const nums = ['interaction', 'offlineFinalExam', 'offlineTotal', 'comprehensiveRegular', 'finalTotal', 'regularScore', 'finalScore', 'onlineTotal']
+  for (const k of nums) {
+    if (form[k] == null || form[k] === '') {
+      formError.value = '请填写所有成绩字段'
+      return
+    }
+    if (form[k] < 0 || form[k] > 100) {
+      formError.value = '成绩字段应在 0-100 范围内'
+      return
+    }
+  }
+  saving.value = true
+  try {
+    await addStudent({ ...form })
+    showAddModal.value = false
+    await refreshStudents()
+  } catch (e) {
+    formError.value = '保存失败: ' + (e.response?.data?.message || e.message)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function handleDelete(id, name) {
+  if (!confirm(`确认删除学生 "${name}" 的记录吗？`)) return
+  try {
+    await deleteStudent(id)
+    await refreshStudents()
+  } catch (e) {
+    alert('删除失败: ' + (e.response?.data?.message || e.message))
+  }
+}
 
 const stats = computed(() => {
   if (students.value.length === 0) return null
@@ -90,6 +160,8 @@ function goTo(pageNum) {
 const fieldMap = [
   { key: 'studentName', label: '学生姓名' },
   { key: 'interaction', label: '线下_互动' },
+  { key: 'offlineFinalExam', label: '线下_期末考试' },
+  { key: 'offlineTotal', label: '线下总成绩' },
   { key: 'comprehensiveRegular', label: '综合_平时成绩' },
   { key: 'finalTotal', label: '期末总成绩' },
   { key: 'regularScore', label: '平时成绩' },
@@ -101,8 +173,76 @@ const fieldMap = [
 <template>
   <div class="history-page">
     <div class="page-header">
-      <h1>历史数据</h1>
-      <p class="subtitle">共 {{ students.length }} 条学生成绩记录，来源：Score_dataset.xlsx (7个Sheet)</p>
+      <div class="header-row">
+        <div>
+          <h1>历史数据</h1>
+          <p class="subtitle">共 {{ students.length }} 条学生成绩记录</p>
+        </div>
+        <button class="btn-add" @click="openAddModal">+ 添加学生</button>
+      </div>
+    </div>
+
+    <!-- Add Student Modal -->
+    <div v-if="showAddModal" class="modal-overlay" @click.self="showAddModal = false">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>添加学生数据</h3>
+          <button class="btn-close" @click="showAddModal = false">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>学生姓名 <span class="required">*</span></label>
+            <input v-model="form.studentName" type="text" placeholder="请输入姓名" />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>线下互动 <span class="required">*</span></label>
+              <input v-model.number="form.interaction" type="number" step="0.1" min="0" max="100" placeholder="0-100" />
+            </div>
+            <div class="form-group">
+              <label>线下期末考试 <span class="required">*</span></label>
+              <input v-model.number="form.offlineFinalExam" type="number" step="0.1" min="0" max="100" placeholder="0-100" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>线下总成绩 <span class="required">*</span></label>
+              <input v-model.number="form.offlineTotal" type="number" step="0.1" min="0" max="100" placeholder="0-100" />
+            </div>
+            <div class="form-group">
+              <label>综合平时成绩 <span class="required">*</span></label>
+              <input v-model.number="form.comprehensiveRegular" type="number" step="0.1" min="0" max="100" placeholder="0-100" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>期末总成绩 <span class="required">*</span></label>
+              <input v-model.number="form.finalTotal" type="number" step="0.1" min="0" max="100" placeholder="0-100" />
+            </div>
+            <div class="form-group">
+              <label>平时成绩 <span class="required">*</span></label>
+              <input v-model.number="form.regularScore" type="number" step="0.1" min="0" max="100" placeholder="0-100" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>期末成绩 <span class="required">*</span></label>
+              <input v-model.number="form.finalScore" type="number" step="0.1" min="0" max="100" placeholder="0-100" />
+            </div>
+            <div class="form-group">
+              <label>线上总成绩 <span class="required">*</span></label>
+              <input v-model.number="form.onlineTotal" type="number" step="0.1" min="0" max="100" placeholder="0-100" />
+            </div>
+          </div>
+          <div v-if="formError" class="form-error">{{ formError }}</div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-cancel" @click="showAddModal = false">取消</button>
+          <button class="btn-submit" :disabled="saving" @click="handleAddSubmit">
+            {{ saving ? '保存中...' : '确认添加' }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Loading -->
@@ -118,7 +258,7 @@ const fieldMap = [
 
     <!-- Empty -->
     <div v-else-if="students.length === 0" class="state-card">
-      <p>暂无历史数据，请先运行 import_to_db.py 导入数据</p>
+      <p>暂无历史数据，请点击"添加学生"手动录入，或运行 import_to_db.py 批量导入</p>
     </div>
 
     <!-- Content -->
@@ -158,6 +298,7 @@ const fieldMap = [
               <tr>
                 <th>#</th>
                 <th v-for="f in fieldMap" :key="f.key">{{ f.label }}</th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody>
@@ -170,6 +311,9 @@ const fieldMap = [
                 <td>{{ row.regularScore != null ? row.regularScore.toFixed(1) : '-' }}</td>
                 <td>{{ row.finalScore != null ? row.finalScore.toFixed(1) : '-' }}</td>
                 <td :class="scoreClass(row.onlineTotal)">{{ row.onlineTotal != null ? row.onlineTotal.toFixed(1) : '-' }}</td>
+                <td class="action-cell">
+                  <button class="btn-delete" @click="handleDelete(row.id, row.studentName)">删除</button>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -203,8 +347,72 @@ export default {
 <style scoped>
 .history-page { max-width: 1200px; margin: 0 auto; }
 .page-header { margin-bottom: 28px; }
-.page-header h1 { font-size: 24px; font-weight: 600; color: #1a1a2e; }
+.header-row { display: flex; justify-content: space-between; align-items: flex-start; }
+.page-header h1 { font-size: 24px; font-weight: 600; color: #1a1a2e; margin: 0; }
 .subtitle { color: #666; margin-top: 6px; font-size: 14px; }
+
+.btn-add {
+  padding: 10px 22px; background: #1a237e; color: #fff; border: none;
+  border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-add:hover { background: #283593; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+.modal-card {
+  background: #fff; border-radius: 14px; width: 580px; max-width: 95vw;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.18); overflow: hidden;
+}
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 20px 28px; border-bottom: 1px solid #eee;
+}
+.modal-header h3 { margin: 0; font-size: 18px; color: #1a1a2e; }
+.btn-close {
+  background: none; border: none; font-size: 24px; color: #999; cursor: pointer;
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px;
+}
+.btn-close:hover { background: #f5f5f5; color: #333; }
+.modal-body { padding: 24px 28px; }
+.form-group { flex: 1; margin-bottom: 16px; }
+.form-group label { display: block; font-size: 13px; color: #555; margin-bottom: 6px; font-weight: 500; }
+.form-group input {
+  width: 100%; padding: 9px 12px; border: 1px solid #ddd; border-radius: 6px;
+  font-size: 14px; box-sizing: border-box;
+}
+.form-group input:focus { outline: none; border-color: #1a237e; box-shadow: 0 0 0 2px rgba(26,35,126,0.1); }
+.form-row { display: flex; gap: 16px; }
+.required { color: #e53935; }
+.form-error { color: #c62828; font-size: 13px; margin-top: 4px; padding: 8px 12px; background: #fff5f5; border-radius: 6px; }
+.modal-footer {
+  display: flex; justify-content: flex-end; gap: 12px;
+  padding: 16px 28px; border-top: 1px solid #eee; background: #fafafa;
+}
+.btn-cancel {
+  padding: 9px 20px; border: 1px solid #d0d0d0; border-radius: 6px;
+  background: #fff; cursor: pointer; font-size: 14px; color: #555;
+}
+.btn-cancel:hover { background: #f5f5f5; }
+.btn-submit {
+  padding: 9px 20px; border: none; border-radius: 6px;
+  background: #1a237e; color: #fff; cursor: pointer; font-size: 14px; font-weight: 500;
+}
+.btn-submit:hover { background: #283593; }
+.btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Table delete */
+.action-cell { text-align: center; }
+.btn-delete {
+  padding: 4px 12px; border: 1px solid #ffcdd2; border-radius: 4px;
+  background: #fff; color: #c62828; cursor: pointer; font-size: 12px;
+  transition: all 0.2s;
+}
+.btn-delete:hover { background: #ffebee; border-color: #ef5350; }
 
 .state-card {
   background: #fff; border-radius: 12px; padding: 60px 40px;

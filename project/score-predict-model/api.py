@@ -256,13 +256,18 @@ class TrainConfig(BaseModel):
     class_bins: list[float] = [-1.0, 59.9, 79.9, 89.9, 101.0]
     class_labels: list[str] = ["不及格", "中", "良", "优"]
     range_limit: dict | None = None
+    data_source: str = "excel"
 
 
 @app.get("/api/train/options")
-def get_train_options():
+def get_train_options(source: str = "excel"):
     try:
-        from main import get_available_features
-        info = get_available_features()
+        if source == "db":
+            from main import get_available_features_from_db
+            info = get_available_features_from_db()
+        else:
+            from main import get_available_features
+            info = get_available_features()
         return {"code": 200, "data": info}
     except Exception as e:
         return {"code": 500, "message": f"读取数据失败: {str(e)}"}
@@ -271,7 +276,12 @@ def get_train_options():
 @app.post("/api/train")
 def train(config: TrainConfig):
     try:
-        from main import train_model
+        if config.data_source == "db":
+            from main import train_model_from_db
+            train_fn = train_model_from_db
+        else:
+            from main import train_model
+            train_fn = train_model
 
         cfg = {
             "target_col": config.target_col,
@@ -286,7 +296,7 @@ def train(config: TrainConfig):
         if config.range_limit is not None:
             cfg["range_limit"] = config.range_limit
 
-        result = train_model(cfg)
+        result = train_fn(cfg)
 
         # 训练完成后加锁加载新模型
         with _model_lock:

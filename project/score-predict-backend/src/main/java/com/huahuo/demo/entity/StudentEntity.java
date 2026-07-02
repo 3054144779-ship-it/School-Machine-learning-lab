@@ -20,6 +20,12 @@ public class StudentEntity {
     @Column(name = "interaction")
     private Double interaction;          // 线下_互动
 
+    @Column(name = "offline_final_exam")
+    private Double offlineFinalExam;     // 线下_期末考试
+
+    @Column(name = "offline_total")
+    private Double offlineTotal;         // 线下总成绩
+
     @Column(name = "comprehensive_regular")
     private Double comprehensiveRegular; // 综合_平时成绩
 

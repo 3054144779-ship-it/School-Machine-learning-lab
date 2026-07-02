@@ -8,6 +8,7 @@ const loading = ref(false)
 const training = ref(false)
 const error = ref('')
 const successMsg = ref('')
+const dataSource = ref('excel')
 
 // 可用选项
 const availableFeatures = ref([])
@@ -45,17 +46,16 @@ function toLabel(name) {
 }
 
 // ========== 初始化 ==========
-onMounted(async () => {
+async function loadOptions() {
   loading.value = true
   error.value = ''
   try {
-    const res = await getTrainOptions()
+    const res = await getTrainOptions(dataSource.value)
     if (res.data.code === 200 && res.data.data) {
       const data = res.data.data
       availableFeatures.value = data.numeric_features || []
       categoricalHints.value = data.categorical_features || []
       totalSamples.value = data.total_samples || 0
-      // 默认全选（排除明显是目标变量的列）
       const exclude = ['线上总成绩', '线上_平时成绩', '线上_期中测试', '线上_期末考试']
       selectedFeatures.value = availableFeatures.value.filter(f => !exclude.includes(f) && !f.startsWith('参与度等级'))
     } else {
@@ -66,7 +66,16 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(() => { loadOptions() })
+
+function onSourceChange() {
+  trainResult.value = null
+  successMsg.value = ''
+  error.value = ''
+  loadOptions()
+}
 
 onUnmounted(() => {
   barChart?.dispose()
@@ -103,6 +112,7 @@ async function startTrain() {
       random_state: randomState.value,
       max_depth: maxDepth.value,
       correlation_threshold: corrThreshold.value,
+      data_source: dataSource.value,
     })
     if (res.data.code === 200 && res.data.data) {
       trainResult.value = res.data.data
@@ -210,7 +220,7 @@ function formatPercent(v) {
   <div class="train-page">
     <div class="page-header">
       <h1>模型训练</h1>
-      <p class="subtitle">选择特征与参数，重新训练预测模型</p>
+      <p class="subtitle">选择特征与参数，重新训练预测模型 · 数据源: {{ dataSource === 'excel' ? 'Excel 文件' : '数据库' }} · {{ totalSamples }} 条样本</p>
     </div>
 
     <!-- 加载 -->
@@ -227,9 +237,26 @@ function formatPercent(v) {
     <div v-else class="train-layout">
       <!-- ====== 左侧：配置面板 ====== -->
       <div class="config-panel">
+        <!-- 数据源选择 -->
+        <div class="card">
+          <h3>数据源</h3>
+          <div class="source-selector">
+            <button
+              class="source-btn"
+              :class="{ active: dataSource === 'excel' }"
+              @click="dataSource = 'excel'; onSourceChange()"
+            >Excel 文件</button>
+            <button
+              class="source-btn"
+              :class="{ active: dataSource === 'db' }"
+              @click="dataSource = 'db'; onSourceChange()"
+            >数据库</button>
+          </div>
+        </div>
+
         <div class="card">
           <h3>特征选择 <span class="badge">{{ selectedFeatures.length }}/{{ availableFeatures.filter(f => !['线上总成绩', '线上_平时成绩', '线上_期中测试', '线上_期末考试'].includes(f) && !f.startsWith('参与度等级')).length }}</span></h3>
-          <p class="hint">选择用于训练的特征列（共 {{ totalSamples }} 条样本）</p>
+          <p class="hint">选择用于训练的特征列</p>
 
           <div class="feature-actions">
             <button class="btn-link" @click="toggleAll">全选 / 取消全选</button>
@@ -505,6 +532,30 @@ function formatPercent(v) {
   font-size: 12px;
   color: #999;
   margin-bottom: 10px;
+}
+
+/* ---- 数据源选择 ---- */
+.source-selector {
+  display: flex;
+  gap: 10px;
+}
+.source-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.2s;
+}
+.source-btn:hover { border-color: #3949ab; color: #3949ab; }
+.source-btn.active {
+  border-color: #1a237e;
+  background: #e8eaf6;
+  color: #1a237e;
 }
 
 /* ---- 特征列表 ---- */

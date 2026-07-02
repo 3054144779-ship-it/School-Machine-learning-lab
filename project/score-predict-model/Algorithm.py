@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import Ridge
 from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, recall_score
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 
@@ -8,7 +8,7 @@ from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 class Algorithm:
     def __init__(self, max_depth=5, random_state=42):
         self.clf = DecisionTreeClassifier(max_depth=max_depth, random_state=random_state)
-        self.lr = LinearRegression()
+        self.lr = Ridge(alpha=10.0)
         self.feature_names = None
 
     def fit(self, X_train, y_train_reg, y_train_clf):
