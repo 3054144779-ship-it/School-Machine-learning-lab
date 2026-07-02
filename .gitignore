@@ -24,3 +24,7 @@ bin/
 .settings/
 .classpath
 .project
+
+# 忽略训练好的模型文件
+saved_models/
+*.pkl

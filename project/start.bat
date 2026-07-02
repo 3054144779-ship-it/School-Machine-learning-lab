@@ -16,7 +16,7 @@ REM  CONDA ENVIRONMENT (edit this if using conda)
 REM  Set CONDA_ENV to your conda environment name
 REM  Leave empty to use whatever python is on PATH
 REM =============================================
-set "CONDA_ENV=comda"
+set "CONDA_ENV=new_env"
 REM Example: set "CONDA_ENV=ml_env"
 
 REM =============================================

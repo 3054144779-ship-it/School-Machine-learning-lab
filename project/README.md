@@ -91,7 +91,9 @@ project/
         ├── views/
         │   ├── PredictView.vue # 个体预测页
         │   ├── AnalysisView.vue# 总体分析页
-        │   └── TreeView.vue    # 决策树可视化页
+        │   ├── TrainView.vue   # 模型训练页
+        │   ├── TreeView.vue    # 决策树可视化页
+        │   └── HistoryView.vue # 历史数据页
         ├── api/index.js        # API 封装
         └── router/index.js     # 路由配置
 ```
@@ -108,6 +110,12 @@ project/
 ### 模型可视化
 以树形图渲染分类决策树完整结构，展示每个分支节点的判定条件和叶子节点的分类结果。
 
+### 模型训练
+在线交互式训练界面，支持自定义选择参与训练的特征列，调节测试集比例（10%-40%）、决策树最大深度（2-15）、随机种子、相关性阈值等超参数。训练完成后展示线性回归和决策树两个模型的完整评估指标（R²/MAE/RMSE/Accuracy/Precision/Recall）、混淆矩阵、特征权重及特征重要性图表。
+
+### 历史数据
+展示已导入的 518 条学生历史成绩数据，提供统计卡片（总人数、四项均值）和成绩分布柱状图，支持分页浏览完整数据表。
+
 ## API 接口
 
 | 端点 | 方法 | 说明 |
@@ -116,6 +124,8 @@ project/
 | `/api/prediction/predict` | POST | 提交特征值，返回预测分数和等级 |
 | `/api/prediction/analysis` | GET | 获取特征重要性 + 相关性矩阵 |
 | `/api/prediction/tree` | GET | 获取决策树结构（ECharts 格式） |
+| `/api/prediction/train/options` | GET | 获取可训练特征列表 |
+| `/api/prediction/train` | POST | 提交训练配置，触发模型训练 |
 | `/api/students/history` | GET | 获取历史学生数据 |
 
 ### 预测请求示例
